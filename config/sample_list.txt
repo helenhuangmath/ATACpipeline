@@ -1,0 +1,14 @@
+# One row per sample, tab-separated. Lines starting with # are skipped.
+#   sample      sample ID (letters, numbers, _ . -)
+#   fastq1/2    gzipped R1 / R2 fastq, inside DATADIR (or a full path). Several lanes: L1_R1.fastq.gz,L2_R1.fastq.gz
+#   group       samples analysed together, e.g. a cell type (consensus peaks, counts, DESeq2); one value if all together
+#   condition   group for consensus peaks and DESeq2, e.g. Ctrl, KO
+#   replicate   1, 2, ...
+#   batch       batch label (same for all samples if one batch)
+sample	fastq1	fastq2	group	condition	replicate	batch
+CD8_Ctrl_R1	CD8_Ctrl_R1_R1.fastq.gz	CD8_Ctrl_R1_R2.fastq.gz	CD8	Ctrl	1	b1
+CD8_Ctrl_R2	CD8_Ctrl_R2_R1.fastq.gz	CD8_Ctrl_R2_R2.fastq.gz	CD8	Ctrl	2	b2
+CD8_Arid2KO_R1	CD8_Arid2KO_R1_R1.fastq.gz	CD8_Arid2KO_R1_R2.fastq.gz	CD8	Arid2KO	1	b1
+CD8_Arid2KO_R2	CD8_Arid2KO_R2_R1.fastq.gz	CD8_Arid2KO_R2_R2.fastq.gz	CD8	Arid2KO	2	b2
+CD8_Pbrm1KO_R1	CD8_Pbrm1KO_R1_R1.fastq.gz	CD8_Pbrm1KO_R1_R2.fastq.gz	CD8	Pbrm1KO	1	b1
+CD8_Pbrm1KO_R2	CD8_Pbrm1KO_R2_R1.fastq.gz	CD8_Pbrm1KO_R2_R2.fastq.gz	CD8	Pbrm1KO	2	b2

@@ -1,0 +1,19 @@
+# Command-line tools for the ATAC-seq pipeline
+# Create once:  conda env create -f envs/atac.yml   (mamba is faster)
+name: atac
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.10
+  - fastqc=0.12
+  - fastp=0.23
+  - multiqc=1.21
+  - bowtie2=2.5
+  - samtools=1.19
+  - bedtools=2.31
+  - deeptools=3.5
+  - macs2=2.2.9.1
+  - subread=2.0.6     # featureCounts with --countReadPairs
+  - homer=4.11        # optional: only used if HOMER_GENOME is set
+  - curl

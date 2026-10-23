@@ -1,0 +1,11 @@
+# ShellCheck settings (Google Shell Style Guide)
+# Follow "source" lines to the files they read (scripts/common.sh), looked
+# up next to the script that sources them
+external-sources=true
+source-path=SCRIPTDIR
+# Variables set in config.sh (sourced by read_config) are not "unassigned"
+disable=SC2154
+# ShellCheck 0.11 reports "function only defined later" when two functions
+# call the same, earlier defined function; all functions here are defined
+# before main runs
+disable=SC2218
