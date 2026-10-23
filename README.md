@@ -20,14 +20,12 @@ FASTQ ─▶ FastQC + MultiQC ─▶ fastp ─▶ bowtie2 ─▶ filter, remove 
 ```
 
 Each step, what it does and what to check: [PIPELINE_STEPS.txt](PIPELINE_STEPS.txt).
-Built with the same design as [CUTRUNpipeline](https://github.com/helenhuangmath/CUTRUNpipeline): the same
-commands, folders and reference files.
 
 ---
 
 ## 1. Install (once)
 
-You need conda (Miniconda or Miniforge). Create the two software environments:
+Use conda (Miniconda or Miniforge). Create the two software environments:
 
 ```bash
 git clone https://github.com/helenhuangmath/ATACpipeline.git ~/ATACpipeline
@@ -49,9 +47,6 @@ Supported: `mm10`, `hg38` and `hg19`. It downloads the genome (UCSC), the blackl
 (GENCODE), and makes the bowtie2 index (1-3 hours), `mm10.genomesize`, `mm10.chr1toY.bed`,
 `mm10-blacklist.clean.bed`, the gene annotation and `mm10.tss.bed` (TSSs for the TSS enrichment) in
 `~/indexes/mm10/`.
-
-Already made the reference with CUTRUNpipeline? Run the same command on that folder: nothing is
-downloaded or built again, only `mm10.tss.bed` is added (a few seconds).
 
 ## 3. Set up a project
 
@@ -149,7 +144,7 @@ bash ~/ATACpipeline/check_status.sh config.sh
 | `tss_enrichment` | Tn5 cut sites at TSSs / 1.9-2 kb away | hg38 > 7, mm10 > 10 (computed slightly differently) |
 | `FRiP` | fraction of fragments in union peaks | > 0.3 (> 0.2 acceptable) |
 
-## 7. Tests and code quality
+## 7. Tests
 
 ```bash
 TEST_CONDA_ENV=atac TEST_CONDA_ENV_R=atac_r bash tests/run_tests.sh
@@ -164,8 +159,7 @@ made, and a rerun skips finished steps.
 
 Code follows the [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html) and the
 [Google R Style Guide](https://google.github.io/styleguide/Rguide.html), checked with ShellCheck
-([.shellcheckrc](.shellcheckrc)) and lintr ([.lintr](.lintr)). GitHub Actions runs the linters and the
-tests on every change ([.github/workflows/tests.yml](.github/workflows/tests.yml)).
+([.shellcheckrc](.shellcheckrc)) and lintr ([.lintr](.lintr)).
 
 ## 8. Troubleshooting
 
