@@ -1,0 +1,146 @@
+================================================================================
+ ATAC-seq Pipeline: Steps of Data Alignment and Analysis
+================================================================================
+
+  FASTQ -> FastQC/MultiQC -> trim -> align -> filter/chrM/dedup -> BAM
+                                                 |
+       bigwig + TSS enrichment -> peaks per sample (MACS2)
+                                                 |
+       consensus per condition -> union per group
+                                                 |
+       annotation -> count matrices of all samples -> QC summary
+                                                 |
+       DESeq2 differential peaks -> figures -> HTML report
+
+  [script] = file in scripts/. Settings are in config.sh. Folders are in
+  WORKDIR. Parts of run_pipeline.sh: qc | align | peaks | matrix | diff
+  Group = samples analysed together (column "group" of the sample list).
+
+
+================================================================================
+ PART qc: RAW READS (one job)                     [run_all_samples.sh qc]
+================================================================================
+
+Step 0. Reference genome (once per genome)        [reference/build_reference.sh]
+  Genome, bowtie2 index, <genome>.genomesize, <genome>.chr1toY.bed,
+  <genome>-blacklist.clean.bed (ENCODE v2), genes (GENCODE: TxDb + genes.txt),
+  <genome>.tss.bed (TSSs of protein-coding genes)
+
+QC of raw reads
+  - FastQC of every raw fastq file (each lane)   -> QC/FastQC_raw/
+  - MultiQC report of them                       -> QC/MultiQC/multiqc_raw_fastq.html
+  Check: quality per base, adapter content (Nextera), duplication, GC content.
+
+
+================================================================================
+ PART align and peaks: EACH SAMPLE (one job per sample)
+================================================================================
+
+Step 1. Trimming                                     [01_trim.sh]
+  - Merge lanes (several fastq files of one sample)
+  - fastp: remove adapters and low quality bases -> QC/<sample>.fastp.html
+    Important for ATAC-seq: nucleosome-free fragments are often shorter than
+    the read length, so reads run into the Nextera adapter.
+  - FastQC of the trimmed reads                  -> QC/FastQC_trimmed/
+  Check: adapters gone, reads kept after trimming.
+
+Step 2. Alignment and filtering                      [02_align.sh]
+  - bowtie2 --very-sensitive --no-mixed --no-discordant -X 2000 (ENCODE)
+  - keep properly paired reads (-f 2) with mapping quality >= MIN_MAPQ (30;
+    removes multi-mapping reads)
+  - count mitochondrial reads (MITO_CHR), then keep chr1-chrY only (removes
+    chrM, random, chrUn)
+  - samtools markdup: remove PCR duplicates (REMOVE_DUPLICATES=false: only mark)
+  Output: BAM/<sample>.map.dedup.bam, .bowtie2.log, .idxstats.txt,
+          .align_stats.txt, .fragment_size.txt
+  Check: alignment rate (> 80%), mitochondrial reads (mito_rate), duplicate
+         rate, unique fragments (>= 25M per replicate, ENCODE), fragment
+         sizes: a nucleosome-free peak (< 100 bp) and peaks every ~200 bp
+         (1, 2, 3 nucleosomes); nfr_fraction = fragments < 100 bp.
+
+Step 3. Bigwig and TSS enrichment                    [03_bigwig.sh]
+  - bamCoverage, CPM normalized, each fragment counted once over its full
+    length, blacklist skipped                      -> Wig/<sample>.cpm.bw
+  - TSS enrichment: Tn5 cut sites (reads shifted +4 / -5 bp) within 2 kb of
+    every TSS, in 10-bp bins; score = highest bin within 500 bp of the TSS /
+    mean of the outer 100 bp on each side         -> QC/TSS/
+  Check: TSS enrichment (ENCODE: hg38 > 7, mm10 > 10); look at known marker
+         genes in IGV.
+
+Step 4. Peak calling                                 [04_peaks.sh]
+  - MACS2 --keep-dup all with MACS2_ARGS (default -q 0.01), PEAK_MODE:
+      fragment : -f BAMPE, the real fragment of each read pair
+      cutsite  : Tn5 cut sites extended to 150 bp (--shift -75 --extsize 150)
+  - remove peaks with fold enrichment < MIN_FOLD and in blacklist regions
+  Output: Peak/MACS2/, Peak/peak_<sample>.final.bed
+  Check: number and width of peaks.
+
+
+================================================================================
+ PART matrix: ALL SAMPLES (one job)               [run_all_samples.sh matrix]
+================================================================================
+
+Step 5. Consensus and union peaks (each group)       [05_consensus.sh]
+  - consensus peaks: in >= MIN_REPS replicates of a condition (any number of
+    replicates; replicate peaks closer than CONSENSUS_GAP count as the same)
+  - union peaks: consensus peaks of all conditions merged (UNION_GAP), peaks
+    narrower than MIN_WIDTH removed, peak IDs added
+  Output: Consensus/<group>/peak_consensus_<cond>.bed, peak_<group>_union.bed,
+          Venn diagrams of replicates and conditions, peak width plot
+
+Step 6. Annotation                                   [06_annotate.sh]
+  - ChIPseeker: Promoter (TSS -2 kb to +500 bp) / exon / intron / intergenic,
+    nearest gene, all genes within FLANK bp; Homer (optional)
+  Output: Annotation/<group>/peak_<group>_union.anno.txt, .anno_allgenes.txt
+  Check: % promoter (ATAC-seq: often 20-40%; most other peaks are enhancers).
+
+Step 7. Count matrices of all samples                [07_count_matrix.sh]
+  - featureCounts: fragments of every sample of the group in each union peak
+  - one matrix of all samples (union peaks x samples): raw, normalized with
+    DESeq2 size factors, and variance-stabilized (log2 scale); condition means
+  - FRiP (fraction of fragments in peaks), PCA and correlation of samples
+  Output: ReadCount/<group>/RawRC_<group>.txt, NormRC_<group>.txt,
+          VST_<group>.txt, NormRC_<group>.CondMean.txt, sizeFactors_<group>.txt
+  Check: FRiP (ENCODE: > 0.3, > 0.2 acceptable); replicates cluster together
+         in the PCA.
+
+QC summary of all samples                            [R/qc_summary.R]
+  - MultiQC of all steps; one table and plots: read pairs, alignment,
+    mitochondrial reads, duplicates, nucleosome-free fragments, TSS
+    enrichment, peaks, FRiP, fragment sizes, TSS profiles
+  Output: QC/MultiQC/multiqc_report.html, QC/Summary/
+
+
+================================================================================
+ PART diff: ALL SAMPLES (one job)                 [run_all_samples.sh diff]
+================================================================================
+
+Step 8. Differential peaks                           [08_diff.sh]
+  - one DESeq2 model with all samples of the group, using the raw matrix and
+    size factors of step 7 (DESIGN: ~ condition or ~ batch + condition);
+    peaks with max read count < MIN_COUNT removed
+  - each comparison of comparison_list.txt: padj < PADJ and |log2FC| > LFC
+  Output: DiffPeak/<group>/deseq2_All_/deseq2_Sig_<group>_<trt>_vs_<ref>.txt,
+          _Up.bed, _Down.bed, MA, volcano and heatmap plots, summary
+  Check: MA plot centered at 0; number of differential peaks.
+
+Step 9. Figures                                      [09_figures.sh]
+  - deepTools computeMatrix: signal of every sample +-1 kb of each union peak
+  - Nature-style summary figure (183 mm wide, 7 pt, panels a-i): peaks, FRiP,
+    TSS enrichment, genomic features, PCA, differential peaks, volcano plots,
+    average signal profiles and signal heatmap of differential peaks
+  Output: Figures/<group>/Figure_<group>_summary.pdf, signal_profile_,
+          signal_heatmap_<group>.pdf
+
+Step 10. HTML report                                 [10_report.sh]
+  - one self-contained file for all groups: search a gene, peak ID or locus;
+    table of peaks with statistics of every comparison; signal profile and
+    normalized counts of the selected peak; links to UCSC and IGV;
+    download of the table
+  Output: Report/ATAC_report.html
+
+Downstream (not automatic): motifs (Homer findMotifsGenome.pl) and pathways
+(GREAT, clusterProfiler) of the _Up.bed / _Down.bed peaks; transcription
+factor footprinting (e.g. TOBIAS) on the BAM files.
+
+================================================================================

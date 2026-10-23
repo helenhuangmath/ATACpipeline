@@ -1,0 +1,7 @@
+# Comparisons for DESeq2, tab-separated. Lines starting with # are skipped.
+#   group       group of the sample list (* = all groups)
+#   treatment   e.g. Arid2KO   (log2FC > 0 means more open in Arid2KO)
+#   reference   e.g. Ctrl
+group	treatment	reference
+*	Arid2KO	Ctrl
+*	Pbrm1KO	Ctrl
